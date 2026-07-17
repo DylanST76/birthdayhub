@@ -1,0 +1,234 @@
+// This is your Prisma schema file
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  username          String    @unique
+  passwordHash      String
+  name              String
+  avatar            String?
+  timezone          String    @default("UTC")
+  locale            String    @default("en")
+  theme             Theme     @default(LIGHT)
+  emailVerified     Boolean   @default(false)
+  emailVerifyToken  String?   @unique
+  resetPasswordToken String?  @unique
+  resetPasswordExpiry DateTime?
+  refreshTokens     RefreshToken[]
+  people            Person[]
+  reminders         Reminder[]
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([email])
+}
+
+enum Theme {
+  LIGHT
+  DARK
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Person {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName     String
+  lastName      String?
+  nickname      String?
+  photo         String?
+  birthDate     DateTime
+  birthYear     Int?      // null if year unknown
+  email         String?
+  phone         String?
+  address       String?
+  relationship  String?   // friend, family, colleague, etc.
+  tags          Tag[]     @relation("PersonTags")
+  notes         String?
+  // Social media
+  instagram     String?
+  twitter       String?
+  facebook      String?
+  linkedin      String?
+  tiktok        String?
+  // Tastes
+  tasteProfile  TasteProfile?
+  // Related records
+  gifts         Gift[]
+  wishlists     WishlistItem[]
+  memories      Memory[]
+  reminders     Reminder[]
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([birthDate])
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String
+  color     String   @default("#667eea")
+  userId    String
+  people    Person[] @relation("PersonTags")
+  createdAt DateTime @default(now())
+
+  @@unique([name, userId])
+  @@index([userId])
+}
+
+model TasteProfile {
+  id          String   @id @default(uuid())
+  personId    String   @unique
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  // Colors
+  favoriteColors    String[] @default([])
+  // Food
+  favoriteFoods     String[] @default([])
+  dietaryRestrictions String[] @default([])
+  allergies         String[] @default([])
+  // Entertainment
+  favoriteMusic     String[] @default([])
+  favoriteMovies    String[] @default([])
+  favoriteBooks     String[] @default([])
+  favoriteShows     String[] @default([])
+  // Lifestyle
+  hobbies           String[] @default([])
+  sports            String[] @default([])
+  // Sizes
+  clothingSize      String?
+  shoeSize          String?
+  ringSize          String?
+  // Scents
+  favoritePerfumes  String[] @default([])
+  scentPreferences  String[] @default([])
+  // Brands
+  favoriteBrands    String[] @default([])
+  // Extra
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Gift {
+  id          String     @id @default(uuid())
+  personId    String
+  person      Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  year        Int
+  cost        Float?
+  currency    String     @default("USD")
+  store       String?
+  storeUrl    String?
+  rating      Int?       // 1-5 stars
+  notes       String?
+  photos      String[]   @default([])
+  wasReceived Boolean    @default(false) // true = they gave it to us
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([personId])
+  @@index([year])
+}
+
+model WishlistItem {
+  id          String   @id @default(uuid())
+  personId    String
+  person      Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  url         String?
+  price       Float?
+  currency    String   @default("USD")
+  photo       String?
+  priority    Priority @default(MEDIUM)
+  isPurchased Boolean  @default(false)
+  purchasedAt DateTime?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([personId])
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Memory {
+  id          String     @id @default(uuid())
+  personId    String
+  person      Person     @relation(fields: [personId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  date        DateTime
+  type        MemoryType @default(PHOTO)
+  mediaUrls   String[]   @default([])
+  notes       String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([personId])
+  @@index([date])
+}
+
+enum MemoryType {
+  PHOTO
+  VIDEO
+  NOTE
+  MIXED
+}
+
+model Reminder {
+  id          String         @id @default(uuid())
+  userId      String
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  personId    String
+  person      Person         @relation(fields: [personId], references: [id], onDelete: Cascade)
+  type        ReminderType   @default(DAYS_BEFORE)
+  daysBefore  Int?           // for DAYS_BEFORE type
+  customDate  DateTime?      // for CUSTOM type
+  channels    ReminderChannel[] @default([EMAIL])
+  isActive    Boolean        @default(true)
+  lastSentAt  DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([userId])
+  @@index([personId])
+}
+
+enum ReminderType {
+  DAYS_BEFORE
+  ON_DAY
+  CUSTOM
+}
+
+enum ReminderChannel {
+  EMAIL
+  PUSH
+  SMS
+}
